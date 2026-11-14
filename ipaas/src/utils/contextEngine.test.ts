@@ -179,7 +179,7 @@ const withValues = (id: string, values: Record<string, string>, name?: string): 
 const upload = (name?: string): ContextSourceConfig => withValues('upload', {}, name);
 
 function completeForm(): ContextEngineForm {
-  const github = withValues('github', { repositoryUrl: 'https://github.com/wso2/docs', accessToken: 'ghp_x' });
+  const github = withValues('github', { repository: 'wso2/docs', token: 'ghp_x' });
   return {
     sources: [github],
     roles: ['admin'],
@@ -216,10 +216,10 @@ describe('url helpers', () => {
 
 describe('source validation', () => {
   it('validates a field by kind and required-ness', () => {
-    const url = SOURCE_CONNECTORS.find((c) => c.id === 'github')!.fields.find((f) => f.key === 'repositoryUrl')!;
-    expect(sourceFieldError(url, '')).toBe('Repository URL is required.');
+    const url = SOURCE_CONNECTORS.find((c) => c.id === 'jira')!.fields.find((f) => f.key === 'baseUrl')!;
+    expect(sourceFieldError(url, '')).toBe('Site URL is required.');
     expect(sourceFieldError(url, 'nope')).toBe('Enter a full http(s) URL.');
-    expect(sourceFieldError(url, 'https://github.com/o/r')).toBe('');
+    expect(sourceFieldError(url, 'https://acme.atlassian.net')).toBe('');
     const paths = SOURCE_CONNECTORS.find((c) => c.id === 'github')!.fields.find((f) => f.key === 'includePaths')!;
     expect(sourceFieldError(paths, '')).toBe(''); // optional
     const urls = SOURCE_CONNECTORS.find((c) => c.id === 'website')!.fields.find((f) => f.key === 'urls')!;
@@ -600,8 +600,8 @@ describe('wire payloads', () => {
 
   it('separates settings from credentials and adds azure fields only for azure', () => {
     const payload = toConfigurationPayload(toCreateInput(completeForm()));
-    expect(payload.sources[0].settings).toEqual({ repositoryUrl: 'https://github.com/wso2/docs', branch: 'main', includePaths: '' });
-    expect(payload.sources[0].credentials).toEqual({ accessToken: 'ghp_x' });
+    expect(payload.sources[0].settings).toEqual({ authType: 'token', repository: 'wso2/docs', branch: 'main', includePaths: '', maxFileBytes: '10485760', apiUrl: 'https://api.github.com' });
+    expect(payload.sources[0].credentials).toEqual({ token: 'ghp_x' });
     expect(payload.llm).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6', apiKey: 'sk-ant' });
     expect(payload.embedding.baseUrl).toBeUndefined();
   });
@@ -690,6 +690,38 @@ describe('wire payloads', () => {
 
     const calendar = withValues('google-calendar', { authType: 'bearer', token: 't', eventTypes: 'default' });
     expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false, pageSize: 250 });
+  });
+
+  it('builds the Jira and GitHub settings their integrations take', () => {
+    expect(isConnectorEnabled('jira')).toBe(true);
+    expect(isConnectorEnabled('github')).toBe(true);
+
+    // Jira: the chosen flow's credentials nest under auth, the stale ones of the other flow stay out.
+    const jira = withValues('jira', { baseUrl: 'https://acme.atlassian.net', email: 'ada@acme.com', apiToken: 't', token: 'stale', projectKey: 'ENG', jql: 'issuetype != Sub-task' });
+    expect(isSourceValid(jira)).toBe(true);
+    expect(toIntegrationRequest(jira, 'jira').settings).toEqual({
+      baseUrl: 'https://acme.atlassian.net',
+      auth: { type: 'basic', email: 'ada@acme.com', apiToken: 't' },
+      projectKey: 'ENG',
+      jql: 'issuetype != Sub-task',
+      pageSize: 50,
+    });
+    const oauth = withValues('jira', { baseUrl: 'https://api.atlassian.com/ex/jira/c1', authType: 'bearer', token: 't', projectKey: 'ENG' });
+    expect(toIntegrationRequest(oauth, 'jira').settings).toEqual({ baseUrl: 'https://api.atlassian.com/ex/jira/c1', auth: { type: 'bearer', token: 't' }, projectKey: 'ENG', pageSize: 50 });
+    expect(isSourceValid(withValues('jira', { baseUrl: 'https://acme.atlassian.net', email: 'ada@acme.com', apiToken: 't' }))).toBe(false);
+
+    // GitHub: one token flow, the globs as a list, and the size as a number.
+    const github = withValues('github', { token: 't', repository: 'acme/handbook', includePaths: 'docs/**, **/*.md' });
+    expect(isSourceValid(github)).toBe(true);
+    expect(toIntegrationRequest(github, 'github').settings).toEqual({
+      auth: { type: 'token', token: 't' },
+      repository: 'acme/handbook',
+      branch: 'main',
+      includePaths: ['docs/**', '**/*.md'],
+      maxFileBytes: 10485760,
+      apiUrl: 'https://api.github.com',
+    });
+    expect(isSourceValid(withValues('github', { repository: 'acme/handbook' }))).toBe(false);
   });
 
   it('sends a structured source\'s mapping file as the request\'s mapping, never as a setting', () => {
@@ -822,8 +854,8 @@ describe('drafts', () => {
   it('strips every secret and round-trips the rest', () => {
     const form = completeForm();
     const draft = toDraft(form, '2026-09-23T10:00:00Z');
-    expect(draft.form.sources[0].values.accessToken).toBe('');
-    expect(draft.form.sources[0].values.repositoryUrl).toBe('https://github.com/wso2/docs');
+    expect(draft.form.sources[0].values.token).toBe('');
+    expect(draft.form.sources[0].values.repository).toBe('wso2/docs');
     expect(draft.form.embedding?.apiKey).toBe('');
     expect(draft.form.llm?.apiKey).toBe('');
     expect(draft.form.llm?.model).toBe('claude-sonnet-4-6');

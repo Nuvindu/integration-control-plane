@@ -266,18 +266,32 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'github',
     name: 'GitHub',
-    description: 'Docs, markdown and code in a repository branch.',
+    description: 'Docs, markdown and code in a repository branch, kept in sync.',
     category: 'code',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}github.svg`, logoDark: `${CONNECTOR_LOGO_BASE}github-dark.svg`,
     icon: 'github',
+    // Mirrors the Ballerina `github` integration's settings: a token, the repository branch and
+    // which of its files to sync.
     fields: [
-      F('repositoryUrl', 'Repository URL', 'url', { placeholder: 'https://github.com/org/repo' }),
-      F('branch', 'Branch', 'text', { defaultValue: 'main' }),
-      O('includePaths', 'Include Paths', 'text', { placeholder: 'docs/**, README.md', helper: 'Optional globs, comma separated.' }),
-      F('accessToken', 'Access Token', 'secret', { helper: 'A read-only token with repo scope.' }),
+      ...G(
+        'Connection',
+        F('authType', 'Authentication', 'select', { defaultValue: 'token', options: [{ value: 'token', label: 'Personal access token' }], setting: 'auth.type' }),
+        F('token', 'Access Token', 'secret', { helper: 'Read-only access to the repository contents.', setting: 'auth.token' }),
+      ),
+      ...G(
+        'Data to sync',
+        F('repository', 'Repository', 'text', { placeholder: 'org/repo', helper: 'The owner and name, as owner/name.' }),
+        F('branch', 'Branch', 'text', { defaultValue: 'main' }),
+        O('includePaths', 'Include Paths', 'text', { placeholder: 'docs/**, **/*.md', helper: 'Optional globs, comma separated. Every readable file when empty.', valueType: 'list' }),
+      ),
+      ...G(
+        { label: 'Sync options', collapsed: true },
+        O('maxFileBytes', 'Max File Size', 'text', { defaultValue: '10485760', helper: 'Bytes. Larger files are left out.', valueType: 'integer' }),
+        O('apiUrl', 'API URL', 'url', { defaultValue: 'https://api.github.com', helper: 'For GitHub Enterprise Server: https://<host>/api/v3.' }),
+      ),
     ],
-    summaryKeys: ['repositoryUrl', 'branch'],
+    summaryKeys: ['repository', 'branch'],
   },
   {
     id: 'gitlab',
@@ -317,13 +331,38 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'jira',
     name: 'Jira',
-    description: 'Issues in a project.',
+    description: 'Issues in a project, kept in sync.',
     category: 'code',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}jira.svg`,
     icon: 'kanban',
-    fields: [F('baseUrl', 'Base URL', 'url', { placeholder: 'https://your-org.atlassian.net' }), F('projectKey', 'Project Key', 'text'), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
+    // Mirrors the Ballerina `jira` integration's settings: an auth block, the project and an
+    // optional JQL condition.
+    fields: [
+      ...G(
+        'Connection',
+        F('baseUrl', 'Site URL', 'url', { placeholder: 'https://your-org.atlassian.net' }),
+        F('authType', 'Authentication', 'select', {
+          defaultValue: 'basic',
+          options: [
+            { value: 'basic', label: 'API token' },
+            { value: 'bearer', label: 'OAuth access token' },
+          ],
+          setting: 'auth.type',
+        }),
+        F('email', 'Account Email', 'text', { showWhen: authIs('basic'), setting: 'auth.email' }),
+        F('apiToken', 'API Token', 'secret', { showWhen: authIs('basic'), helper: 'From id.atlassian.com.', setting: 'auth.apiToken' }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires. Use https://api.atlassian.com/ex/jira/<cloudId> as the site URL.', setting: 'auth.token' }),
+      ),
+      ...G(
+        'Data to sync',
+        F('projectKey', 'Project Key', 'text', { placeholder: 'ENG' }),
+        O('jql', 'JQL Filter', 'text', { placeholder: 'issuetype != Sub-task', helper: 'Optional condition every synced issue must meet, without ORDER BY.' }),
+      ),
+      ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '50', helper: 'Issues per page, from 1 to 100.', valueType: 'integer' })),
+    ],
     summaryKeys: ['baseUrl', 'projectKey'],
+    isStructuredData: true,
   },
   { id: 'linear', name: 'Linear', description: 'Issues and project documents.', category: 'code', logo: `${CONNECTOR_LOGO_BASE}linear.svg`, icon: 'kanban', fields: [F('teamKey', 'Team Key', 'text'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['teamKey'] },
   { id: 'asana', name: 'Asana', description: 'Tasks and project descriptions.', category: 'code', logo: `${CONNECTOR_LOGO_BASE}asana.svg`, icon: 'kanban', fields: [F('projectId', 'Project ID', 'text'), F('accessToken', 'Access Token', 'secret')], summaryKeys: ['projectId'] },
@@ -577,7 +616,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql', 'jira', 'github']);
 
 /**
  * Connectors the browser feeds itself, registered straight on the engine. Every other enabled
