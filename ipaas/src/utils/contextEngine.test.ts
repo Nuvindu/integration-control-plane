@@ -302,6 +302,18 @@ describe('source validation', () => {
     expect(visibleFields(sf, { authType: 'bearer' }).map((f) => f.key)).not.toContain('refreshToken');
   });
 
+  it('offers BambooHR with the auth flows of its integration', () => {
+    expect(isConnectorEnabled('bamboohr')).toBe(true);
+    expect(blankSource('bamboohr').values.authType).toBe('apiKey');
+    expect(isSourceValid(withValues('bamboohr', { apiKey: 'k' }))).toBe(false);
+    expect(isSourceValid(withValues('bamboohr', { companyDomain: 'acme', apiKey: 'k' }))).toBe(true);
+    expect(invalidSourceFields(withValues('bamboohr', { companyDomain: 'acme', authType: 'refreshToken', clientId: 'c', clientSecret: 's' })).map((f) => f.key)).toEqual(['refreshToken']);
+
+    // The settings are the integration's own: the auth block nested, the hidden flows' fields left out.
+    const bamboo = withValues('bamboohr', { companyDomain: ' acme ', apiKey: 'k', token: 'stale', pageSize: '50' });
+    expect(toIntegrationRequest(bamboo, 'bamboohr').settings).toEqual({ companyDomain: 'acme', auth: { type: 'apiKey', apiKey: 'k' }, pageSize: 50 });
+  });
+
   it('shows and requires only the fields of the chosen Google auth flow', () => {
     for (const id of ['gdrive', 'google-calendar']) {
       const google = SOURCE_CONNECTORS.find((c) => c.id === id)!;

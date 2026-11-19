@@ -615,6 +615,37 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     summaryKeys: ['baseUrl'],
     isStructuredData: true,
   },
+  {
+    id: 'bamboohr',
+    name: 'BambooHR',
+    description: 'Employees of a company, kept in sync.',
+    category: 'saas',
+    icon: 'building',
+    // Mirrors the Ballerina `bamboohr` integration's settings: its auth block, the company's domain and the page size.
+    fields: [
+      ...G(
+        'Connection',
+        F('companyDomain', 'Company Domain', 'text', { placeholder: 'acme', helper: 'The part of your BambooHR URL before .bamboohr.com.' }),
+        F('authType', 'Authentication', 'select', {
+          defaultValue: 'apiKey',
+          options: [
+            { value: 'apiKey', label: 'API key' },
+            { value: 'refreshToken', label: 'Refresh token' },
+            { value: 'token', label: 'Access token' },
+          ],
+          setting: 'auth.type',
+        }),
+        F('apiKey', 'API Key', 'secret', { showWhen: authIs('apiKey'), helper: 'Has the permissions of the user who created it.', setting: 'auth.apiKey' }),
+        F('clientId', 'Client ID', 'text', { showWhen: authIs('refreshToken'), setting: 'auth.clientId' }),
+        F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refreshToken'), setting: 'auth.clientSecret' }),
+        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refreshToken'), setting: 'auth.refreshToken' }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('token'), helper: 'Not refreshed. Sync stops when it expires.', setting: 'auth.token' }),
+      ),
+      ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '100', helper: 'Employees published per page, from 1 to 1000.', valueType: 'integer' })),
+    ],
+    summaryKeys: ['companyDomain'],
+    isStructuredData: true,
+  },
   { id: 'hubspot', name: 'HubSpot', description: 'Knowledge base articles and notes.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}hubspot.svg`, icon: 'chat', fields: [F('privateAppToken', 'Private App Token', 'secret')], summaryKeys: [] },
   { id: 'intercom', name: 'Intercom', description: 'Help center articles and conversations.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}intercom.svg`, icon: 'headset', fields: [F('accessToken', 'Access Token', 'secret')], summaryKeys: [] },
   {
@@ -675,7 +706,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'bamboohr', 'mysql', 'postgresql', 'mssql']);
 
 /**
  * Connectors the browser feeds itself, registered straight on the engine. Every other enabled
