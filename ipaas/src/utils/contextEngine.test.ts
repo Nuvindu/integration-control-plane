@@ -311,7 +311,10 @@ describe('source validation', () => {
 
     // The settings are the integration's own: the auth block nested, the hidden flows' fields left out.
     const bamboo = withValues('bamboohr', { companyDomain: ' acme ', apiKey: 'k', token: 'stale', pageSize: '50' });
-    expect(toIntegrationRequest(bamboo, 'bamboohr').settings).toEqual({ companyDomain: 'acme', auth: { type: 'apiKey', apiKey: 'k' }, pageSize: 50 });
+    expect(toIntegrationRequest(bamboo, 'bamboohr').settings).toEqual({ companyDomain: 'acme', auth: { type: 'apiKey', apiKey: 'k' }, pollInterval: 900, pageSize: 50 });
+    // The poll interval is seconds, which the BFF turns into the integration's schedule.
+    expect(blankSource('bamboohr').values.pollInterval).toBe('900');
+    expect(toIntegrationRequest(withValues('bamboohr', { companyDomain: 'acme', apiKey: 'k', pollInterval: '3600' }), 'bamboohr').settings.pollInterval).toBe(3600);
   });
 
   it('shows and requires only the fields of the chosen Google auth flow', () => {

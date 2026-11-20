@@ -641,7 +641,27 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
         F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refreshToken'), setting: 'auth.refreshToken' }),
         F('token', 'Access Token', 'secret', { showWhen: authIs('token'), helper: 'Not refreshed. Sync stops when it expires.', setting: 'auth.token' }),
       ),
-      ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '100', helper: 'Employees published per page, from 1 to 1000.', valueType: 'integer' })),
+      ...G(
+        { label: 'Sync options', collapsed: true },
+        // Seconds between runs: the BFF schedules the integration's CronJob from it. Only intervals that divide an hour or a day have a cron schedule.
+        O('pollInterval', 'Poll Interval', 'select', {
+          defaultValue: '900',
+          options: [
+            { value: '300', label: 'Every 5 minutes' },
+            { value: '600', label: 'Every 10 minutes' },
+            { value: '900', label: 'Every 15 minutes' },
+            { value: '1800', label: 'Every 30 minutes' },
+            { value: '3600', label: 'Every hour' },
+            { value: '7200', label: 'Every 2 hours' },
+            { value: '21600', label: 'Every 6 hours' },
+            { value: '43200', label: 'Every 12 hours' },
+            { value: '86400', label: 'Every day' },
+          ],
+          helper: 'How often the employees are synced.',
+          valueType: 'integer',
+        }),
+        O('pageSize', 'Page Size', 'text', { defaultValue: '100', helper: 'Employees published per page, from 1 to 1000.', valueType: 'integer' }),
+      ),
     ],
     summaryKeys: ['companyDomain'],
     isStructuredData: true,
